@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:latest
+    container_name: webbrowser-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - webbrowser-network
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: webbrowser-backend
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/webbrowser
+      JWT_SECRET: your-secret-key-here
+      SEARCH_ENGINE_URL: http://search-engine:8000
+    depends_on:
+      - mongodb
+    networks:
+      - webbrowser-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # Frontend Web App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: webbrowser-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://backend:5000
+    depends_on:
+      - backend
+    networks:
+      - webbrowser-network
+
+  # Python Search Engine
+  search-engine:
+    build:
+      context: ./search-engine
+      dockerfile: Dockerfile
+    container_name: webbrowser-search-engine
+    ports:
+      - "8000:8000"
+    environment:
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/webbrowser
+    depends_on:
+      - mongodb
+    networks:
+      - webbrowser-network
+    volumes:
+      - ./search-engine:/app
+      - search_cache:/app/cache
+
+volumes:
+  mongodb_data:
+  search_cache:
+
+networks:
+  webbrowser-network:
+    driver: bridge
